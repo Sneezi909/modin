@@ -1223,9 +1223,12 @@ class DataFrame(BasePandasDataset):
         )
 
     def pivot(self, index=None, columns=None, values=None):
-        return self._default_to_pandas(
-            pandas.DataFrame.pivot, index=index, columns=columns, values=values
-        )
+        # return self.groupby(index)[[columns, values]].apply(lambda g: g.values.tolist())
+        print("Self type:", type(self))
+        return self._query_compiler.pivot(index=index, columns=columns, values=values)
+        # return self._default_to_pandas(
+        #     pandas.DataFrame.pivot, index=index, columns=columns, values=values
+        # )
 
     def pivot_table(
         self,

@@ -1394,3 +1394,91 @@ class PandasQueryCompiler(BaseQueryCompiler):
             item_to_distribute=broadcasted_items,
         )
         return self.__constructor__(new_modin_frame)
+    
+    # Pivot function
+    def pivot(self, index=None, columns=None, values=None):
+        def pivot_helper(g):
+            return g
+        
+        valid_types = [int, str]
+        if index == None or columns == None or values == None:
+            raise ValueError("Please specify all arguments")
+        if type(index) not in valid_types or type(columns) not in valid_types or type(values) not in valid_types:
+            raise ValueError("Arguments are of invalid type")
+
+        index_col = self.getitem_column_array([index])
+        columns_col = self.getitem_column_array([columns])
+        values_col = self.getitem_column_array([values])        
+        
+        grouped_modin_frame = self._modin_frame.groupby_reduce(
+            index_col,
+            0,
+            columns_col,
+            pivot_helper,
+            values_col
+        )
+        return index_col
+        # copy_modin = new_modin_frame.copy() 
+        # print("Copy_modin type:", type(copy_modin))
+        # print("Copy_modin: ", copy     _modin.to_pandas)
+        
+        # temp = new_modin_frame._apply_full_axis(
+        #     0,
+        #     pivot_helper
+        # )
+        # return self.__constructor__(temp)
+        # return self.__constructor__(new_modin_frame)
+        
+    # Profiling functions.
+    def profiling(name, func_type):
+        import time
+
+        def profiling_helper(df, sleep_time, sleep_scaling_func, init_time):
+            func_name = "{}%%{}".format(name, str(init_time))
+
+            add = True
+            start = time.time()
+            size = df.memory_usage(deep=True, index=False).sum() / 2**20
+            sleep_time = sleep_time * sleep_scaling_func(size)
+            while True:
+                end = time.time()
+                if end > start + sleep_time:
+                    break
+                # if add:
+                #     add = False
+                #     df += 1
+                # else:
+                #     add = True
+                #     df -= 1
+            delimiter = "$$"
+            bench = {
+                    "FUNCTION NAME": func_name,
+                    "TYPE": func_type,
+                    "SIZE": size,
+                    "SLEEP TIME": sleep_time,
+                    "DISPATCH TIME": start-init_time,
+                    "FINISH TIME": end-init_time,
+                    }
+            bench_string = delimiter.join(
+                    [
+                        "{}:{}{}".format(term, delimiter, val) 
+                        for term, val in bench.items()
+                        ]
+                    )
+            print(bench_string)
+            if func_type == "map":
+                return df
+            elif func_type == "reduce":
+                return df.iloc[:, 0]
+        return profiling_helper
+
+    map_partition_profiling = MapFunction.register(profiling("map_partition_profiling", "map"))
+    map_axis_profiling = FoldFunction.register(profiling("map_axis_profiling", "map"))
+    reduce_profiling = ReductionFunction.register(profiling("reduce_profiling", "reduce"))
+    map_reduce_profiling = MapReduceFunction.register(
+            profiling("map_reduce_profiling", "map"), 
+            profiling("map_reduce_profiling", "reduce")
+            )
+
+    # END profiling functions.
+>>>>>>> fa528e5... Add pivot implementation WIP
